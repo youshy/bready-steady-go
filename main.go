@@ -1,41 +1,97 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/smtp"
+	"net/url"
+	"os"
+	"strconv"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 )
 
+const (
+	SHIPTON  = "https://www.shipton-mill.com"
+	MATTHEWS = "https://www.fwpmatthews.co.uk/"
+)
+
 func main() {
-	//updateMill()
-	checkMill()
+	updateMill(SHIPTON)
+	updateMill(MATTHEWS)
+	worker()
 }
 
-func checkMill() {
-	sel := getMill()
+func worker() {
+	log.Printf("Dusting flour...\n")
+	freq, _ := strconv.Atoi(os.Getenv("FREQUENCY"))
+	f := time.Duration(freq)
+	uptimeTicker := time.NewTicker(f * time.Second)
 
-	b, _ := ioutil.ReadFile("mill.txt")
-
-	state := string(b)
-
-	if sel != state {
-		log.Printf("The page has changed!\n")
-	} else {
-		log.Printf("Still the same\n")
+	for {
+		select {
+		case <-uptimeTicker.C:
+			checkMill(SHIPTON)
+			checkMill(MATTHEWS)
+		}
 	}
 }
 
-func updateMill() {
-	sel := getMill()
+func checkMill(mill string) {
+	sel := getMill(mill)
 
-	_ = ioutil.WriteFile("mill.txt", []byte(sel), 0644)
-	log.Printf("updated file\n")
+	if mill == SHIPTON {
+		b, _ := ioutil.ReadFile("shiptonmill.txt")
+
+		state := string(b)
+
+		log.Printf("SHIPTON MILL\n")
+		if sel != state {
+			log.Printf("The page has changed!\n")
+			err := notify(SHIPTON)
+			if err != nil {
+				log.Fatal(err)
+			}
+		} else {
+			log.Printf("Still the same\n")
+		}
+	}
+	if mill == MATTHEWS {
+		b, _ := ioutil.ReadFile("matthewsmill.txt")
+
+		state := string(b)
+
+		log.Printf("MATTHEWS MILL\n")
+		if sel != state {
+			log.Printf("The page has changed!\n")
+			err := notify(MATTHEWS)
+			if err != nil {
+				log.Fatal(err)
+			}
+		} else {
+			log.Printf("Still the same\n")
+		}
+	}
 }
 
-func getMill() string {
-	res, err := http.Get("https://www.shipton-mill.com")
+func updateMill(mill string) {
+	sel := getMill(mill)
+
+	if mill == SHIPTON {
+		_ = ioutil.WriteFile("shiptonmill.txt", []byte(sel), 0644)
+		log.Printf("updated shipton mill file\n")
+	}
+	if mill == MATTHEWS {
+		_ = ioutil.WriteFile("matthewsmill.txt", []byte(sel), 0644)
+		log.Printf("updated matthews mill file\n")
+	}
+}
+
+func getMill(mill string) string {
+	res, err := http.Get(mill)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -49,13 +105,43 @@ func getMill() string {
 		log.Fatal(err)
 	}
 
-	log.Printf("got the page\n")
+	var result string
 
-	var strong string
+	if mill == SHIPTON {
+		doc.Find(".well").Each(func(i int, s *goquery.Selection) {
+			result = s.Find("p").Text()
+		})
+	}
+	if mill == MATTHEWS {
+		doc.Find(".storeclosing_popup").Each(func(i int, s *goquery.Selection) {
+			result = s.Find("div").Text()
+		})
+	}
+	return result
+}
 
-	doc.Find(".well").Each(func(i int, s *goquery.Selection) {
-		strong = s.Find("p").Text()
-	})
+type smtpServer struct {
+	host string
+	port string
+}
 
-	return strong
+func (s *smtpServer) Address() string {
+	return s.host + ":" + s.port
+}
+
+func notify(mill string) error {
+	from := os.Getenv("NOTIFICATION_EMAIL_SEND")
+	password := os.Getenv("NOTIFICATION_EMAIL_SEND_PASSWORD")
+
+	receiver := []string{os.Getenv("NOTIFICATION_EMAIL_RECEIVER")}
+
+	smtpServer := smtpServer{host: "smtp.gmail.com", port: "587"}
+
+	u, _ := url.Parse(mill)
+
+	message := []byte(fmt.Sprintf("%s mill has changed something!", u.Host))
+
+	auth := smtp.PlainAuth("", from, password, smtpServer.host)
+
+	return smtp.SendMail(smtpServer.Address(), auth, from, receiver, message)
 }
