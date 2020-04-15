@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"net/smtp"
-	"net/url"
 	"os"
 	"strconv"
 	"time"
@@ -55,6 +54,7 @@ func checkMill(mill string) {
 			if err != nil {
 				log.Fatal(err)
 			}
+			log.Fatalf("This is a hard exit to not overflood me with notifications\n")
 		} else {
 			log.Printf("Still the same\n")
 		}
@@ -71,6 +71,7 @@ func checkMill(mill string) {
 			if err != nil {
 				log.Fatal(err)
 			}
+			log.Fatalf("This is a hard exit to not overflood me with notifications\n")
 		} else {
 			log.Printf("Still the same\n")
 		}
@@ -137,9 +138,17 @@ func notify(mill string) error {
 
 	smtpServer := smtpServer{host: "smtp.gmail.com", port: "587"}
 
-	u, _ := url.Parse(mill)
+	b, _ := ioutil.ReadFile("shiptonmill.txt")
+	state := string(b)
+	var message []byte
 
-	message := []byte(fmt.Sprintf("%s mill has changed something!", u.Host))
+	if mill == SHIPTON {
+		message = []byte(fmt.Sprintf("shipton mill has changed something!\n\n%v", state))
+	}
+
+	if mill == MATTHEWS {
+		message = []byte(fmt.Sprintf("matthews mill has changed something!\n\n%v", state))
+	}
 
 	auth := smtp.PlainAuth("", from, password, smtpServer.host)
 
