@@ -47,16 +47,15 @@ func checkMill(mill string) {
 
 		state := string(b)
 
-		log.Printf("SHIPTON MILL\n")
 		if sel != state {
-			log.Printf("The page has changed!\n")
+			log.Printf("SHIPTON MILL\tThe page has changed!\n")
 			err := notify(SHIPTON, state, sel)
 			if err != nil {
 				log.Fatal(err)
 			}
 			log.Fatalf("This is a hard exit to not overflood me with notifications\n")
 		} else {
-			log.Printf("Still the same\n")
+			log.Printf("SHIPTON MILL\tStill the same\n")
 		}
 	}
 	if mill == MATTHEWS {
@@ -64,16 +63,15 @@ func checkMill(mill string) {
 
 		state := string(b)
 
-		log.Printf("MATTHEWS MILL\n")
 		if sel != state {
-			log.Printf("The page has changed!\n")
+			log.Printf("MATTHEWS MILL\tThe page has changed!\n")
 			err := notify(MATTHEWS, state, sel)
 			if err != nil {
 				log.Fatal(err)
 			}
 			log.Fatalf("This is a hard exit to not overflood me with notifications\n")
 		} else {
-			log.Printf("Still the same\n")
+			log.Printf("MATTHEWS MILL\tStill the same\n")
 		}
 	}
 }
